@@ -1,10 +1,14 @@
 // World, HUD and overlay drawing (GDD 8, 9, 11.5). Browser-only module.
 
-import { TILE, FIELD_Y, COLS, ROWS, VIEW_W, VIEW_H, FLOOR, WALL, LADDER, PIPE } from './level.js';
+import { TILE, FIELD_Y, COLS, ROWS, VIEW_W, VIEW_H, EMPTY, FLOOR, WALL, LADDER, PIPE } from './level.js';
 import { PAL } from './sprites.js';
 import { STATE } from './game.js';
 
 const FIELD_H = ROWS * TILE;
+
+// Floor layout from GDD 2.1: walkable row and the air row above it, per floor.
+const WALK_ROWS = [3, 7, 11];
+const AIR_ROWS = [1, 5, 9];
 
 // 5x7 pixel font, upper case only (GDD 8). '^' is the up arrow glyph.
 const FONT = {
@@ -98,24 +102,50 @@ function clockText(seconds) {
   return `${mm}:${ss}`;
 }
 
-// Dim office furniture drawn behind the playfield (background layer only).
-const DECOR = [
-  { kind: 'window', col: 6,  row: 1 },
-  { kind: 'window', col: 11, row: 1 },
-  { kind: 'window', col: 2,  row: 5 },
-  { kind: 'window', col: 14, row: 5 },
-  { kind: 'window', col: 9,  row: 9 },
-  { kind: 'window', col: 16, row: 9 },
-  { kind: 'desk',   col: 7,  row: 3 },
-  { kind: 'desk',   col: 3,  row: 7 },
-  { kind: 'desk',   col: 16, row: 7 },
-  { kind: 'desk',   col: 9,  row: 11 },
-  { kind: 'desk',   col: 13, row: 11 },
-  { kind: 'cooler', col: 6,  row: 7 },
-  { kind: 'plant',  col: 13, row: 7 },
-  { kind: 'plant',  col: 4,  row: 11 },
-  { kind: 'fridge', col: 3,  row: 10 },
-];
+// Office furniture is derived from the map, so every level gets a sensible
+// background without a hand-written list. Deterministic: no randomness.
+function buildDecor(level, exitTile) {
+  const decor = [];
+  const used = new Set();
+  const key = (c, r) => c + ',' + r;
+  const free = (c, r) => level.inBounds(c, r) && level.tile(c, r) === EMPTY && !used.has(key(c, r));
+  const span = (c, r, w, h) => {
+    for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) if (!free(c + dc, r + dr)) return false;
+    return true;
+  };
+  const take = (kind, c, r, w, h) => {
+    for (let dr = 0; dr < h; dr++) for (let dc = 0; dc < w; dc++) used.add(key(c + dc, r + dr));
+    decor.push({ kind, col: c, row: r });
+  };
+  const standsOn = (c, r, w) => {
+    for (let dc = 0; dc < w; dc++) if (!level.isSolid(c + dc, r + 1)) return false;
+    return true;
+  };
+
+  // A fridge beside the office door, on whichever side has room for it.
+  for (const dc of [1, -1, 2, -2, 3, -3]) {
+    const c = exitTile.col + dc;
+    if (span(c, exitTile.row - 1, 1, 2)) { take('fridge', c, exitTile.row - 1, 1, 2); break; }
+  }
+
+  // Windows with blinds high up on every floor.
+  for (const row of AIR_ROWS) {
+    for (let c = 2; c <= COLS - 4; c += 5) if (span(c, row, 2, 2)) take('window', c, row, 2, 2);
+  }
+
+  // Desks and props standing on the walkable row of every floor.
+  for (const row of WALK_ROWS) {
+    for (let c = 3; c <= COLS - 3; c += 6) {
+      if (span(c, row, 2, 1) && standsOn(c, row, 2)) take('desk', c, row, 2, 1);
+    }
+    for (const [kind, from] of [['cooler', 6], ['plant', 12]]) {
+      for (let c = from; c <= COLS - 2; c++) {
+        if (span(c, row, 1, 1) && standsOn(c, row, 1)) { take(kind, c, row, 1, 1); break; }
+      }
+    }
+  }
+  return decor;
+}
 
 function px(ctx, x, y, w, h, color) {
   ctx.fillStyle = color;
@@ -167,11 +197,13 @@ export class Renderer {
     this.sprites = sprites;
     this.bg = null;
     this.bgDirty = true;
+    this.bgSerial = -1;
   }
 
   invalidate() { this.bgDirty = true; }
 
-  buildBackground(level) {
+  buildBackground(game) {
+    const level = game.level;
     if (!this.bg) {
       this.bg = document.createElement('canvas');
       this.bg.width = VIEW_W;
@@ -186,7 +218,7 @@ export class Renderer {
     // Push the back wall down so gameplay objects stay the brightest thing on screen.
     g.fillStyle = 'rgba(16, 16, 24, 0.45)';
     g.fillRect(0, 0, VIEW_W, FIELD_H);
-    for (const d of DECOR) drawDecor(g, d.kind, d.col * TILE, d.row * TILE);
+    for (const d of buildDecor(level, game.exitTile)) drawDecor(g, d.kind, d.col * TILE, d.row * TILE);
     // Baseboard under every walkable row.
     for (let r = 0; r < ROWS - 1; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -194,12 +226,13 @@ export class Renderer {
       }
     }
     this.bgDirty = false;
+    this.bgSerial = game.levelSerial;
   }
 
   draw(game) {
     const ctx = this.ctx;
     const level = game.level;
-    if (this.bgDirty) this.buildBackground(level);
+    if (this.bgDirty || this.bgSerial !== game.levelSerial) this.buildBackground(game);
 
     ctx.imageSmoothingEnabled = false;
     px(ctx, 0, 0, VIEW_W, VIEW_H, PAL.VOID);
@@ -286,10 +319,19 @@ export class Renderer {
     drawText(ctx, `TIME ${clockText(game.time)}`, 4, 18, PAL.TEXT);
     if (game.hintActive) {
       if (Math.floor(game.clock * 4) % 2 === 0) {
-        drawText(ctx, 'GO BACK TO FLOOR 1', 160, 18, PAL.ACCENT, 1, 'center');
+        drawText(ctx, game.exitHint, 160, 18, PAL.ACCENT, 1, 'center');
       }
     } else {
       drawText(ctx, 'COLLECT THE FOOD', 160, 18, PAL.TEXT_DIM, 1, 'center');
+    }
+    drawText(ctx, `LEVEL ${game.levelNumber}/${game.totalLevels}`, 316, 18, PAL.TEXT_DIM, 1, 'right');
+  }
+
+  // Score breakdown shared by LEVEL_CLEAR and WIN, revealed line by line.
+  drawBreakdown(game, lines, top) {
+    for (let i = 0; i < lines.length; i++) {
+      if (game.stateTime < i * 0.3) break;
+      drawText(this.ctx, lines[i][0], VIEW_W / 2, top + i * 14, lines[i][1], 1, 'center');
     }
   }
 
@@ -351,7 +393,7 @@ export class Renderer {
         if (blink1) drawText(ctx, 'PRESS ^ TO START', cx, 126, PAL.TEXT, 1, 'center');
         drawText(ctx, 'ARROWS: MOVE / UP-DOWN: LADDERS', cx, 150, PAL.TEXT_DIM, 1, 'center');
         drawText(ctx, 'COLLECT ALL FOOD', cx, 172, PAL.TEXT_DIM, 1, 'center');
-        drawText(ctx, 'AND RETURN TO YOUR FLOOR', cx, 186, PAL.TEXT_DIM, 1, 'center');
+        drawText(ctx, 'AND RETURN TO YOUR OWN DOOR', cx, 186, PAL.TEXT_DIM, 1, 'center');
         break;
       case STATE.READY:
         this.plaque(cx - 44, 108, 88, 22);
@@ -360,31 +402,45 @@ export class Renderer {
       case STATE.CAUGHT:
         drawText(ctx, 'CAUGHT!', cx, 112, PAL.ALERT, 2, 'center');
         break;
-      case STATE.WIN: {
+      case STATE.LEVEL_CLEAR: {
         this.dim(0.5);
-        const b = game.breakdown || { food: 0, returnBonus: 0, timeBonus: 0, total: game.score };
-        drawText(ctx, 'MISSION COMPLETE', cx, 56, PAL.ACCENT, 2, 'center');
-        const lines = [
+        const b = game.breakdown;
+        drawText(ctx, `LEVEL ${b.level} CLEARED`, cx, 48, PAL.ACCENT, 2, 'center');
+        this.drawBreakdown(game, [
           [`FOOD ${pad6(b.food)}`, PAL.TEXT],
           [`RETURN BONUS ${pad6(b.returnBonus)}`, PAL.TEXT],
           [`TIME BONUS ${pad6(b.timeBonus)}`, PAL.TEXT],
           ['----------------------', PAL.TEXT_DIM],
-          [`TOTAL ${pad6(b.total)}`, PAL.ACCENT],
-        ];
-        for (let i = 0; i < lines.length; i++) {
-          if (game.stateTime < i * 0.3) break;
-          drawText(ctx, lines[i][0], cx, 92 + i * 14, lines[i][1], 1, 'center');
-        }
+          [`LEVEL TOTAL ${pad6(b.levelTotal)}`, PAL.TEXT],
+          [`SCORE ${pad6(b.total)}`, PAL.ACCENT],
+        ], 82);
         if (game.stateTime > 1.5 && blink1) {
-          drawText(ctx, 'PRESS ^ TO PLAY AGAIN', cx, 186, PAL.TEXT, 1, 'center');
+          drawText(ctx, `PRESS ^ FOR LEVEL ${game.nextLevelNumber}`, cx, 188, PAL.TEXT, 1, 'center');
+        }
+        break;
+      }
+      case STATE.WIN: {
+        this.dim(0.5);
+        const b = game.breakdown;
+        drawText(ctx, 'MISSION COMPLETE', cx, 48, PAL.ACCENT, 2, 'center');
+        this.drawBreakdown(game, [
+          [`FOOD ${pad6(b.food)}`, PAL.TEXT],
+          [`RETURN BONUS ${pad6(b.returnBonus)}`, PAL.TEXT],
+          [`TIME BONUS ${pad6(b.timeBonus)}`, PAL.TEXT],
+          ['----------------------', PAL.TEXT_DIM],
+          [`GRAND TOTAL ${pad6(b.total)}`, PAL.ACCENT],
+        ], 82);
+        if (game.stateTime > 1.5 && blink1) {
+          drawText(ctx, 'PRESS ^ TO PLAY AGAIN', cx, 188, PAL.TEXT, 1, 'center');
         }
         break;
       }
       case STATE.GAME_OVER:
         this.dim(0.7);
-        drawText(ctx, 'GAME OVER', cx, 92, PAL.ALERT, 2, 'center');
-        drawText(ctx, `SCORE ${pad6(game.score)}`, cx, 124, PAL.TEXT, 1, 'center');
-        if (blink1) drawText(ctx, 'PRESS ^ TO RESTART', cx, 160, PAL.TEXT, 1, 'center');
+        drawText(ctx, 'GAME OVER', cx, 84, PAL.ALERT, 2, 'center');
+        drawText(ctx, `REACHED LEVEL ${game.levelNumber}`, cx, 112, PAL.TEXT_DIM, 1, 'center');
+        drawText(ctx, `SCORE ${pad6(game.score)}`, cx, 130, PAL.TEXT, 1, 'center');
+        if (blink1) drawText(ctx, 'PRESS ^ TO RESTART', cx, 164, PAL.TEXT, 1, 'center');
         break;
       default:
         break;

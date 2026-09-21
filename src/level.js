@@ -55,7 +55,13 @@ export class Level {
 }
 
 // Parses the ASCII map. Returns { level, errors }; level is null when invalid.
-export function parseLevel(rows, itemTable, enemyTable) {
+// Expected entity counts come from the level's own data, not from constants:
+// `expected.items` defaults to the size of itemTable, `expected.enemies` to the
+// size of enemyTable, so a level with 5 items and 2 enemies validates as strictly
+// as one with 8 and 4.
+export function parseLevel(rows, itemTable, enemyTable, expected = {}) {
+  const wantItems = expected.items === undefined ? Object.keys(itemTable).length : expected.items;
+  const wantEnemies = expected.enemies === undefined ? Object.keys(enemyTable).length : expected.enemies;
   const errors = [];
   if (!Array.isArray(rows) || rows.length !== ROWS) {
     errors.push(`map must have ${ROWS} rows, got ${Array.isArray(rows) ? rows.length : 'none'}`);
@@ -98,8 +104,12 @@ export function parseLevel(rows, itemTable, enemyTable) {
   }
 
   if (!spawn) errors.push("map has no '@' spawn tile");
-  if (items.length !== 8) errors.push(`expected 8 items, got ${items.length}`);
-  if (enemies.length !== 4) errors.push(`expected 4 enemies, got ${enemies.length}`);
+  if (items.length !== wantItems) errors.push(`expected ${wantItems} items, got ${items.length}`);
+  if (enemies.length !== wantEnemies) errors.push(`expected ${wantEnemies} enemies, got ${enemies.length}`);
+  const seenItems = new Set(items.map((i) => i.char));
+  if (seenItems.size !== items.length) errors.push('duplicate item symbol on the map');
+  const seenEnemies = new Set(enemies.map((e) => e.char));
+  if (seenEnemies.size !== enemies.length) errors.push('duplicate enemy symbol on the map');
 
   items.sort((a, b) => a.char.localeCompare(b.char));
   enemies.sort((a, b) => a.char.localeCompare(b.char));

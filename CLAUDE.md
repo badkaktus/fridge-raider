@@ -21,7 +21,7 @@ const k={left:0,right:0,up:0,down:0};
 g.update(1/60,k);                 // one neutral frame arms the UP edge
 k.up=1; g.update(1/60,k); k.up=0; // UP starts the level from TITLE
 k.right=1; for(let i=0;i<600;i++) g.update(1/60,k);
-console.log(g.state,g.collected,g.score);"   // -> READY 2 200
+console.log(g.state,g.levelNumber,g.collected,g.score);"   // -> PLAYING 1 1 100
 ```
 
 `Game.update(dt, input)` takes a plain key-state object (`{left,right,up,down}`), which is what
@@ -57,12 +57,27 @@ the player always has escapes the enemies cannot take. Enemy state machine
 (`PATROL`/`CHASE`/`SEARCH`) lives in `enemy.js`; aggro/lose ranges are injected from level data,
 not hardcoded.
 
-**The level is an ASCII map** in `data/level1.js` (`#` wall, `=` floor, `H` ladder, `~` pipe,
-`.` empty, `@` spawn/door, `1`-`8` items, `A`-`D` enemies), parsed and validated by
-`parseLevel` in `level.js`. The same 13 rows are duplicated in `docs/GDD.md` §10.2 (ASCII block)
-and §10.3 (JS block) — after any map edit, verify all three copies match character for character.
-Balance constants (`AGGRO_RANGE`, `LOSE_RANGE`, `INVULN_TIME`, enemy speeds and patrols) live in
-`data/level1.js` as the single source of truth.
+**Levels are ASCII maps** (`#` wall, `=` floor, `H` ladder, `~` pipe, `.` empty, `@` spawn/door,
+digits items, letters enemies), parsed and validated by `parseLevel` in `level.js`. There are two
+data files — `data/level1.js` (tutorial, starts on floor 2) and `data/level2.js` (the original
+map) — and `data/levels.js` exports the ordered registry `LEVELS` plus the one global constant
+`LIVES_START`. Each map is duplicated in a design document: level 2 in `docs/GDD.md` §10.2 (ASCII
+block) and §10.3 (JS block), level 1 in `docs/LEVEL1.md` §3 (ASCII block) and §3.1 (JS block).
+After any map edit, verify **all** copies match character for character.
+
+Balance constants (`AGGRO_RANGE`, `LOSE_RANGE`, `INVULN_TIME`, `SPAWN_TILE`, `EXIT_TILE`,
+`RESPAWN_TILE`, `TOTAL_ITEMS`, `RETURN_BONUS`, `TIME_BONUS_CAP`, `EXIT_HINT`, enemy speeds and
+patrols) are per-level data, never module constants: `game.js` reads them from the current level
+and injects the aggro/lose ranges into each `Enemy`. `parseLevel` takes the expected entity counts
+as an argument (defaulting to the sizes of the level's own item and enemy tables), so a 5-item
+2-enemy level validates just as strictly as an 8-item 4-enemy one.
+
+**The campaign is a sequence, and only `game.js` knows the order.** `LEVELS[0]` is always the
+start. Clearing a non-final level goes to `LEVEL_CLEAR`; clearing the last one goes to `WIN` with
+a grand total. Score and lives carry across levels (lives are never refilled); the timer,
+`collected` and the shield are per level. `GAME_OVER` and `WIN` both restart the whole campaign
+from level 1. Adding a level means adding a data file and one entry in `data/levels.js` —
+nothing in `render.js`, `input.js` or the logic modules should need to change.
 
 **Sprites are replaceable data.** `sprites.js` reads `assets/sprites/manifest.json`
 (`frameW/frameH/frames/fps/loop/offsetX/offsetY`, frames laid out as a horizontal strip, all
