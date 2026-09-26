@@ -105,7 +105,11 @@ nothing in `render.js`, `input.js` or the logic modules should need to change.
 (`frameW/frameH/frames/fps/loop/offsetX/offsetY`, frames laid out as a horizontal strip, all
 characters drawn facing right and mirrored in code) and falls back to procedural placeholders
 when a PNG is missing or fails to load — the level stays fully playable with no art at all.
-Keep it that way: any new drawable needs both a manifest entry and a placeholder.
+Keep it that way: any new drawable needs both a manifest entry and a placeholder. PNGs are
+fetched with `cache: 'no-cache'` (then handed to an `Image` via an object URL) so a replaced file
+shows up on the next reload instead of lingering in the HTTP cache; keep that when touching
+`loadImage`. When testing the loader in Node against `python3 -m http.server`, cap concurrency
+at about 6 like a browser does — unthrottled fetches get `ECONNRESET` from that server.
 
 ## Conventions
 

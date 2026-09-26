@@ -104,16 +104,27 @@ export class SpriteRegistry {
     await Promise.all(jobs);
   }
 
-  loadImage(key, url) {
-    return new Promise((resolve) => {
+  // The PNG is fetched with `cache: 'no-cache'` so the browser revalidates it on
+  // every load: a replaced sprite shows up on the next reload instead of the old
+  // one lingering in the HTTP cache, and an unchanged one costs only a 304.
+  async loadImage(key, url) {
+    let objectUrl = null;
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) return;
+      objectUrl = URL.createObjectURL(await res.blob());
       const img = new Image();
-      img.onload = () => {
-        if (img.naturalWidth > 0) this.images[key] = img;
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = url;
-    });
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        img.src = objectUrl;
+      });
+      if (img.naturalWidth > 0) this.images[key] = img;
+    } catch (err) {
+      // Missing or unreadable file: the procedural placeholder stays in use.
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }
   }
 
   // Draws one frame; falls back to the procedural placeholder when no PNG is loaded.
