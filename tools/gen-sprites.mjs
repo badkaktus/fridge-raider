@@ -153,6 +153,7 @@ const HERO = charPal({ shirt: '#3CBCFC', shirtLight: '#A8E8FC', hair: '#6A4A28' 
 const CLEANER = charPal({ shirt: '#308030', shirtLight: '#58B058', hair: '#2A5A2A' });
 const GUARD = charPal({ shirt: '#1848A0', shirtLight: '#3868D0', hair: '#101838' });
 const BOSS = charPal({ shirt: '#A02020', shirtLight: '#D04040', hair: '#707088' });
+const CEO = charPal({ shirt: '#E0E0E8', shirtLight: '#F8F8F8', hair: '#A0A0B8' });
 
 /* ----------------------------------------------------------- humanoids --- */
 
@@ -419,6 +420,64 @@ const TIE = [
   '......yy........',
   '......yy........',
   '......yy........',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+];
+
+// Chief executive (level 3): broad shoulders, 1 px gold tie, phone at the ear.
+const SHOULDERS = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '..b........b....',
+  '..b........b....',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+];
+
+const GOLD_TIE = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '.......y........',
+  '.......y........',
+  '.......y........',
+  '.......y........',
+  '................',
+  '................',
+  '................',
+];
+
+const PHONE = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '..........kk....',
+  '..........ks....',
+  '...........sb...',
+  '...........bb...',
+  '................',
+  '................',
   '................',
   '................',
   '................',
@@ -731,6 +790,8 @@ written.push(writeStrip('enemy_guard_walk.png', walk.map((f) => overlay(overlay(
 written.push(writeStrip('enemy_guard_climb.png', climb.map((f) => overlay(f, CAP)), GUARD));
 written.push(writeStrip('enemy_boss_walk.png', walk.map((f) => overlay(overlay(f, TIE), MUG)), BOSS));
 written.push(writeStrip('enemy_boss_climb.png', climb, BOSS));
+// The chief executive never climbs, so there is no enemy_ceo_climb strip.
+written.push(writeStrip('enemy_ceo_walk.png', walk.map((f) => overlay(overlay(overlay(f, SHOULDERS), GOLD_TIE), PHONE)), CEO));
 
 // Items
 for (const [name, def] of Object.entries(ITEMS)) {

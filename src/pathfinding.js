@@ -45,6 +45,31 @@ export function buildGraph(level) {
   return { size, isNode, neighbors };
 }
 
+// Restricts the shared graph to what one enemy type may use (LEVEL3.md 6.2).
+// A node survives only if level.floorOf(row) is in `floors` (null = all floors).
+// An edge survives only if both ends survive and, for climbs === false, only if
+// it is horizontal. The result has the same shape as buildGraph's, so every AI
+// decision made on it simply cannot name a forbidden tile.
+export function restrictGraph(graph, level, { floors = null, climbs = true } = {}) {
+  const allowed = floors === null ? null : new Set(floors);
+  const isNode = new Uint8Array(graph.size);
+  for (let i = 0; i < graph.size; i++) {
+    if (!graph.isNode[i]) continue;
+    if (allowed && !allowed.has(level.floorOf(nodeRow(i)))) continue;
+    isNode[i] = 1;
+  }
+  const neighbors = new Int16Array(graph.size * 4).fill(-1);
+  for (let i = 0; i < graph.size; i++) {
+    if (!isNode[i]) continue;
+    for (let d = 0; d < 4; d++) {
+      if (!climbs && (d === UP || d === DOWN)) continue;
+      const n = graph.neighbors[i * 4 + d];
+      if (n >= 0 && isNode[n]) neighbors[i * 4 + d] = n;
+    }
+  }
+  return { size: graph.size, isNode, neighbors };
+}
+
 export function isGraphNode(graph, col, row) {
   if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
   return graph.isNode[nodeIndex(col, row)] === 1;

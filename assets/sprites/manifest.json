@@ -13,6 +13,7 @@
     "enemy_guard_climb":   { "file": "enemy_guard_climb.png",   "frameW": 16, "frameH": 16, "frames": 2, "fps": 8,  "loop": true, "offsetX": 0, "offsetY": 0 },
     "enemy_boss_walk":     { "file": "enemy_boss_walk.png",     "frameW": 16, "frameH": 16, "frames": 4, "fps": 9,  "loop": true, "offsetX": 0, "offsetY": 0 },
     "enemy_boss_climb":    { "file": "enemy_boss_climb.png",    "frameW": 16, "frameH": 16, "frames": 2, "fps": 7,  "loop": true, "offsetX": 0, "offsetY": 0 },
+    "enemy_ceo_walk":      { "file": "enemy_ceo_walk.png",      "frameW": 16, "frameH": 16, "frames": 4, "fps": 6,  "loop": true, "offsetX": 0, "offsetY": 0 },
 
     "item_yogurt":   { "file": "item_yogurt.png",   "frameW": 16, "frameH": 16, "frames": 2, "fps": 4, "loop": true, "offsetX": 0, "offsetY": 0 },
     "item_cola":     { "file": "item_cola.png",     "frameW": 16, "frameH": 16, "frames": 2, "fps": 4, "loop": true, "offsetX": 0, "offsetY": 0 },

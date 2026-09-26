@@ -195,8 +195,10 @@ export class Enemy {
   }
 
   // Animation key (GDD 11.6): vertical movement or hanging uses the climb set.
+  // A type that never climbs (climb: 0) has no climb set at all (LEVEL3.md 4.2).
   animKey() {
-    const set = this.mode === MODE_CLIMB || this.mode === MODE_HANG ? 'climb' : 'walk';
+    const climbs = this.climbSpeed > 0;
+    const set = climbs && (this.mode === MODE_CLIMB || this.mode === MODE_HANG) ? 'climb' : 'walk';
     return `enemy_${this.type}_${set}`;
   }
 }

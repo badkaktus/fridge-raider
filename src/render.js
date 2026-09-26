@@ -6,9 +6,6 @@ import { STATE } from './game.js';
 
 const FIELD_H = ROWS * TILE;
 
-// Floor layout from GDD 2.1: walkable row and the air row above it, per floor.
-const WALK_ROWS = [3, 7, 11];
-const AIR_ROWS = [1, 5, 9];
 
 // 5x7 pixel font, upper case only (GDD 8). '^' is the up arrow glyph.
 const FONT = {
@@ -104,7 +101,7 @@ function clockText(seconds) {
 
 // Office furniture is derived from the map, so every level gets a sensible
 // background without a hand-written list. Deterministic: no randomness.
-function buildDecor(level, exitTile) {
+export function buildDecor(level, exitTile) {
   const decor = [];
   const used = new Set();
   const key = (c, r) => c + ',' + r;
@@ -128,13 +125,19 @@ function buildDecor(level, exitTile) {
     if (span(c, exitTile.row - 1, 1, 2)) { take('fridge', c, exitTile.row - 1, 1, 2); break; }
   }
 
-  // Windows with blinds high up on every floor.
-  for (const row of AIR_ROWS) {
-    for (let c = 2; c <= COLS - 4; c += 5) if (span(c, row, 2, 2)) take('window', c, row, 2, 2);
+  // Windows with blinds high up on every floor. The floor layout is level data
+  // (FLOORS): a floor with two overhead rows gets a full 2x2 window, a 3-row
+  // floor with a single overhead row gets a half-height transom (LEVEL3.md 1.5).
+  for (const f of level.floors) {
+    const tall = f.walk - f.top >= 2;
+    const h = tall ? 2 : 1;
+    for (let c = 2; c <= COLS - 4; c += 5) {
+      if (span(c, f.top, 2, h)) take(tall ? 'window' : 'transom', c, f.top, 2, h);
+    }
   }
 
   // Desks and props standing on the walkable row of every floor.
-  for (const row of WALK_ROWS) {
+  for (const row of level.floors.map((f) => f.walk)) {
     for (let c = 3; c <= COLS - 3; c += 6) {
       if (span(c, row, 2, 1) && standsOn(c, row, 2)) take('desk', c, row, 2, 1);
     }
@@ -159,6 +162,12 @@ function drawDecor(ctx, kind, x, y) {
       px(ctx, x + 2, y + 2, 28, 28, PAL.VOID);
       for (let i = 4; i < 28; i += 4) px(ctx, x + 2, y + i, 28, 1, PAL.DARK);
       px(ctx, x + 15, y + 2, 2, 28, PAL.DARK);
+      break;
+    case 'transom':
+      px(ctx, x, y, 32, 16, PAL.DARK);
+      px(ctx, x + 2, y + 2, 28, 12, PAL.VOID);
+      for (let i = 5; i < 14; i += 4) px(ctx, x + 2, y + i, 28, 1, PAL.DARK);
+      px(ctx, x + 15, y + 2, 2, 12, PAL.DARK);
       break;
     case 'desk':
       px(ctx, x + 8, y + 1, 10, 6, PAL.DARK);

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 python3 -m http.server 8000        # serve the game; open http://localhost:8000
-node tools/gen-sprites.mjs         # redraw all 25 PNG sprite strips into assets/sprites/
+node tools/gen-sprites.mjs         # redraw all 26 PNG sprite strips into assets/sprites/
 node --check src/game.js           # syntax check (no build step, no linter, no package.json)
 ```
 
@@ -38,7 +38,7 @@ never depends on monitor refresh rate.
 
 **DOM boundary is load-bearing.** `src/main.js`, `src/render.js`, `src/sprites.js` and
 `src/input.js` may touch the DOM. `src/game.js`, `src/level.js`, `src/player.js`,
-`src/enemy.js`, `src/pathfinding.js` and `data/level1.js` must not — not even at import time.
+`src/enemy.js`, `src/pathfinding.js` and every file in `data/` must not — not even at import time.
 Breaking this breaks every headless check.
 
 **Determinism is a hard invariant.** No `Math.random()` anywhere in logic; enemy decisions come
@@ -55,25 +55,46 @@ is a passable tile *with support*; vertical edges exist only inside ladders. Thi
 never drop through the floor hatches or off pipe ends, and it is the structural guarantee that
 the player always has escapes the enemies cannot take. Enemy state machine
 (`PATROL`/`CHASE`/`SEARCH`) lives in `enemy.js`; aggro/lose ranges are injected from level data,
-not hardcoded.
+not hardcoded (an `ENEMY_TABLE` entry may override them with its own `aggro`/`lose`).
+
+**Every enemy type has its own graph** (`pathfinding.js: restrictGraph`). `createGame` builds,
+once per level, one subgraph per type from the shared graph: nodes on floors the type is not
+allowed on (`ENEMY_FLOORS` in the level data, keyed by type; a missing type may use every floor)
+are removed together with their edges, and a type with `climb: 0` gets no vertical edges at all.
+`Game.updatePlaying` passes each enemy its own graph (`enemy.graph`), and every AI decision —
+visibility, chase, search, patrol, return to post, anti-stall — only ever names neighbours from
+that graph. So "the ceo is the only one on floor 4" is structural in exactly the way "enemies
+never fall" is: no input can produce a step that is not in the graph. Load-time checks refuse a
+level whose enemy post or patrol tiles are not reachable nodes of the enemy's own graph, or whose
+type graph contains a node on a forbidden floor. Levels without `ENEMY_FLOORS` get type graphs
+identical to the shared one, so their behaviour does not change.
 
 **Levels are ASCII maps** (`#` wall, `=` floor, `H` ladder, `~` pipe, `.` empty, `@` spawn/door,
-digits items, letters enemies), parsed and validated by `parseLevel` in `level.js`. There are two
-data files — `data/level1.js` (tutorial, starts on floor 2) and `data/level2.js` (the original
-map) — and `data/levels.js` exports the ordered registry `LEVELS` plus the one global constant
-`LIVES_START`. Each map is duplicated in a design document: level 2 in `docs/GDD.md` §10.2 (ASCII
-block) and §10.3 (JS block), level 1 in `docs/LEVEL1.md` §3 (ASCII block) and §3.1 (JS block).
+digits items, letters enemies), parsed and validated by `parseLevel` in `level.js`. There are three
+data files — `data/level1.js` (tutorial, starts on floor 2), `data/level2.js` (the original map)
+and `data/level3.js` (finale: four floors, the ceo alone on floor 4) — and `data/levels.js`
+exports the ordered registry `LEVELS` plus the one global constant `LIVES_START`. Each map is
+duplicated in a design document: level 1 in `docs/LEVEL1.md` §3 (ASCII) and §3.1 (JS), level 2 in
+`docs/GDD.md` §10.2 (ASCII) and §10.3 (JS), level 3 in `docs/LEVEL3.md` §4 (ASCII) and §4.1 (JS).
 After any map edit, verify **all** copies match character for character.
 
+**Floors are level data, not a formula.** Each level exports `FLOORS`
+(`{ floor, top, walk, slab }` per floor; the slab row belongs to the floor above it). Levels 1–2
+use four-row floors, level 3 uses three-row floors so that four fit in 13 rows. `parseLevel`
+validates the table (rows 1–12 covered exactly once, slab right under walk) and `Level.floorOf(row)`
+answers from it; there is no module-level `floorOf` any more. `render.js` also takes walk rows and
+overhead rows from `FLOORS` (full 2×2 windows on four-row floors, half-height transoms on
+three-row floors). Physics never looks at floor numbers.
+
 Balance constants (`AGGRO_RANGE`, `LOSE_RANGE`, `INVULN_TIME`, `SPAWN_TILE`, `EXIT_TILE`,
-`RESPAWN_TILE`, `TOTAL_ITEMS`, `RETURN_BONUS`, `TIME_BONUS_CAP`, `EXIT_HINT`, enemy speeds and
-patrols) are per-level data, never module constants: `game.js` reads them from the current level
+`RESPAWN_TILE`, `TOTAL_ITEMS`, `RETURN_BONUS`, `TIME_BONUS_CAP`, `EXIT_HINT`, `FLOORS`,
+`ENEMY_FLOORS`, enemy speeds and patrols) are per-level data, never module constants: `game.js` reads them from the current level
 and injects the aggro/lose ranges into each `Enemy`. `parseLevel` takes the expected entity counts
 as an argument (defaulting to the sizes of the level's own item and enemy tables), so a 5-item
 2-enemy level validates just as strictly as an 8-item 4-enemy one.
 
 **The campaign is a sequence, and only `game.js` knows the order.** `LEVELS[0]` is always the
-start. Clearing a non-final level goes to `LEVEL_CLEAR`; clearing the last one goes to `WIN` with
+start; there are three levels. Clearing a non-final level goes to `LEVEL_CLEAR`; clearing the last one goes to `WIN` with
 a grand total. Score and lives carry across levels (lives are never refilled); the timer,
 `collected` and the shield are per level. `GAME_OVER` and `WIN` both restart the whole campaign
 from level 1. Adding a level means adding a data file and one entry in `data/levels.js` —

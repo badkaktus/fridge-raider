@@ -2,7 +2,7 @@
 // No DOM access.
 
 import { parseLevel } from './level.js';
-import { buildGraph } from './pathfinding.js';
+import { buildGraph, restrictGraph, bfs, nodeIndex } from './pathfinding.js';
 import { Player } from './player.js';
 import { Enemy } from './enemy.js';
 import { LEVELS, LIVES_START } from '../data/levels.js';
@@ -26,8 +26,8 @@ const HIT_X = 3, HIT_Y = 2, HIT_W = 10, HIT_H = 14;
 export const NEUTRAL_INPUT = { left: false, right: false, up: false, down: false, lastHoriz: 0 };
 
 export class Game {
-  // `levels` is an ordered array of { def, level, graph }; only this class knows
-  // about the order (LEVEL1.md 8.1).
+  // `levels` is an ordered array of { def, level, graph, typeGraphs }; only this
+  // class knows about the order (LEVEL1.md 8.1).
   constructor(levels, config = {}) {
     this.levels = levels;
     this.totalLevels = levels.length;
@@ -70,9 +70,17 @@ export class Game {
   loadLevel(index) {
     this.levelIndex = index;
     this.levelSerial++;
-    const { def, level } = this.levels[index];
-    const tuning = { aggroRange: def.aggroRange, loseRange: def.loseRange };
-    this.enemies = level.enemies.map((d) => new Enemy(d, tuning));
+    const { def, level, typeGraphs } = this.levels[index];
+    this.enemies = level.enemies.map((d) => {
+      // Per-enemy aggro / lose override the level values (LEVEL3.md 4.2).
+      const enemy = new Enemy(d, {
+        aggroRange: d.aggro === undefined ? def.aggroRange : d.aggro,
+        loseRange: d.lose === undefined ? def.loseRange : d.lose,
+      });
+      // Every AI decision of this enemy goes through its own type's graph.
+      enemy.graph = typeGraphs.get(graphKey(d));
+      return enemy;
+    });
     this.items = level.items.map((it) => ({ ...it, collected: false }));
     this.collected = 0;
     this.time = 0;
@@ -148,7 +156,7 @@ export class Game {
 
     const pc = this.player.centerCol;
     const pr = this.player.centerRow;
-    for (const enemy of this.enemies) enemy.update(dt, level, this.graph, pc, pr);
+    for (const enemy of this.enemies) enemy.update(dt, level, enemy.graph, pc, pr);
 
     this.collectItems(pc, pr);
 
@@ -203,6 +211,47 @@ export class Game {
   }
 }
 
+// Graphs are shared by every enemy with the same type and climbing ability.
+function graphKey(def) { return `${def.type}|${def.climb > 0 ? 'climbs' : 'walks'}`; }
+
+// Builds one restricted graph per enemy type (LEVEL3.md 6.2) and checks the
+// load-time rules of LEVEL3.md 6.3. Returns { typeGraphs, errors }.
+function buildTypeGraphs(def, level, graph) {
+  const errors = [];
+  const typeGraphs = new Map();
+  for (const d of level.enemies) {
+    const key = graphKey(d);
+    if (!typeGraphs.has(key)) {
+      const floors = def.enemyFloors && def.enemyFloors[d.type] ? def.enemyFloors[d.type] : null;
+      typeGraphs.set(key, restrictGraph(graph, level, { floors, climbs: d.climb > 0 }));
+    }
+    const g = typeGraphs.get(key);
+    const post = nodeIndex(d.col, d.row);
+    if (!g.isNode[post]) { errors.push(`enemy ${d.char}: post (${d.col}, ${d.row}) is not a node of the ${d.type} graph`); continue; }
+    const { dist } = bfs(g, post);
+    for (let c = d.patrolFrom; c <= d.patrolTo; c++) {
+      if (dist[nodeIndex(c, d.patrolRow)] < 0) {
+        errors.push(`enemy ${d.char}: patrol tile (${c}, ${d.patrolRow}) is not reachable in the ${d.type} graph`);
+      }
+    }
+  }
+  // Self-check: a type never owns a node on a floor it is not allowed on.
+  if (def.enemyFloors) {
+    for (const d of level.enemies) {
+      const allowed = def.enemyFloors[d.type];
+      if (!allowed) continue;
+      const g = typeGraphs.get(graphKey(d));
+      for (let i = 0; i < g.size; i++) {
+        if (g.isNode[i] && !allowed.includes(level.floorOf((i / level.cols) | 0))) {
+          errors.push(`${d.type} graph contains a node on a forbidden floor`);
+          break;
+        }
+      }
+    }
+  }
+  return { typeGraphs, errors };
+}
+
 // Parses and validates every level, then builds the campaign.
 // Returns null and reports the first broken level instead of throwing.
 export function createGame(onError = (msg) => console.error(msg), levelDefs = LEVELS) {
@@ -211,6 +260,7 @@ export function createGame(onError = (msg) => console.error(msg), levelDefs = LE
     const { level, errors } = parseLevel(def.map, def.itemTable, def.enemyTable, {
       items: def.totalItems,
       enemies: Object.keys(def.enemyTable).length,
+      floors: def.floors,
     });
     if (!level) {
       onError(`Level ${def.number} validation failed: ${errors.join('; ')}`);
@@ -220,7 +270,13 @@ export function createGame(onError = (msg) => console.error(msg), levelDefs = LE
       onError(`Level ${def.number}: '@' at (${level.spawn.col}, ${level.spawn.row}) does not match SPAWN_TILE`);
       return null;
     }
-    parsed.push({ def, level, graph: buildGraph(level) });
+    const graph = buildGraph(level);
+    const typed = buildTypeGraphs(def, level, graph);
+    if (typed.errors.length) {
+      onError(`Level ${def.number} validation failed: ${typed.errors.join('; ')}`);
+      return null;
+    }
+    parsed.push({ def, level, graph, typeGraphs: typed.typeGraphs });
   }
   if (!parsed.length) {
     onError('No levels defined');

@@ -16,6 +16,14 @@ export const LEVEL_1 = [
   '#==================#',
 ];
 
+// Floor layout (LEVEL3.md 1.5): overhead rows top..walk-1, walkable row, slab.
+// The slab row belongs to the floor it is the floor of.
+export const FLOORS = [
+  { floor: 3, top: 1,  walk: 3,  slab: 4 },
+  { floor: 2, top: 5,  walk: 7,  slab: 8 },
+  { floor: 1, top: 9,  walk: 11, slab: 12 },
+];
+
 export const ITEM_TABLE = {
   '1': { id: 'yogurt',   score: 100 },
   '2': { id: 'cola',     score: 100 },

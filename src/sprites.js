@@ -19,6 +19,8 @@ export const PAL = {
   GUARD:    '#1848A0',
   CLEAN:    '#308030',
   BOSS:     '#A02020',
+  CEO:      '#E0E0E8',
+  CEO_HI:   '#F8F8F8',
   DARK:     '#303050',
   TEXT:     '#F8F8F8',
   TEXT_DIM: '#A0A0B8',
@@ -39,6 +41,7 @@ export const DEFAULT_SPRITES = {
   enemy_guard_climb:   { frames: 2, fps: 8 },
   enemy_boss_walk:     { frames: 4, fps: 9 },
   enemy_boss_climb:    { frames: 2, fps: 7 },
+  enemy_ceo_walk:      { frames: 4, fps: 6 },
   item_yogurt:   { frames: 2, fps: 4 },
   item_cola:     { frames: 2, fps: 4 },
   item_sandwich: { frames: 2, fps: 4 },
@@ -208,7 +211,7 @@ function drawFigure(ctx, o) {
   const hy = 2 + bob;
 
   px(ctx, 5 + lean, hy, 6, 5, PAL.SKIN);
-  px(ctx, 5 + lean, hy, 6, 1, o.hat || dark);
+  px(ctx, 5 + lean, hy, 6, 1, o.hat || o.hair || dark);
   if (o.hat) px(ctx, 9 + lean, hy + 1, 3, 1, o.hat);       // cap peak
   px(ctx, 9 + lean, hy + 2, 1, 1, pose === 'idle' && f === 1 ? PAL.SKIN : dark);
 
@@ -217,7 +220,18 @@ function drawFigure(ctx, o) {
   px(ctx, 12 + lean + wide, 7 + bob, 1, 4, shirt);
   px(ctx, 4 - wide, 12 + bob, 8 + wide * 2, 1, dark);
 
-  if (o.tie) { px(ctx, 7 + lean, 7 + bob, 2, 4, PAL.ACCENT); }
+  if (o.shoulders) {                                       // broad shoulders, rows 8-9
+    px(ctx, 2 + lean - wide, 8 + bob, 1, 2, shirt);
+    px(ctx, 13 + lean + wide, 8 + bob, 1, 2, shirt);
+  }
+  if (o.tie) {
+    const w = o.tieWidth || 2;
+    px(ctx, 9 - w + lean, 7 + bob, w, 4, o.tieColor || PAL.ACCENT);
+  }
+  if (o.phone) {                                           // hand raised to the ear, phone
+    px(ctx, 12 + lean, hy + 3, 1, 4, shirt);
+    px(ctx, 11 + lean, hy + 1, 2, 3, dark);
+  }
   if (o.mop) {
     px(ctx, 13, 3, 1, 10, PAL.PIPE);
     px(ctx, 12, 13, 4, 3, PAL.TEXT_DIM);
@@ -349,6 +363,10 @@ const PLACEHOLDERS = {
   enemy_guard_climb(ctx, f)   { drawFigure(ctx, { shirt: PAL.GUARD, pose: 'climb', frame: f }); },
   enemy_boss_walk(ctx, f)     { drawFigure(ctx, { shirt: PAL.BOSS, pose: 'run', frame: f, wide: true, tie: true, mug: true }); },
   enemy_boss_climb(ctx, f)    { drawFigure(ctx, { shirt: PAL.BOSS, pose: 'climb', frame: f }); },
+  enemy_ceo_walk(ctx, f)      {
+    drawFigure(ctx, { shirt: PAL.CEO, pose: 'run', frame: f, tie: true, tieColor: PAL.ACCENT, tieWidth: 1,
+      phone: true, hair: PAL.TEXT_DIM, shoulders: true });
+  },
   ...ITEM_DRAW,
 };
 

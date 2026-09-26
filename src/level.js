@@ -19,18 +19,46 @@ const TILE_CHARS = { '.': EMPTY, '=': FLOOR, '#': WALL, 'H': LADDER, '~': PIPE }
 export function isPassableTile(t) { return t === EMPTY || t === LADDER || t === PIPE; }
 export function isSolidTile(t)    { return t === FLOOR || t === WALL; }
 
-// Floor number for a row (GDD 2.1).
-export function floorOf(row) { return row >= 9 ? 1 : row >= 5 ? 2 : 3; }
+// Checks a FLOORS table (LEVEL3.md 1.5): the ranges top..slab must cover rows
+// 1..ROWS-1 exactly once, and each slab must sit right under its walk row.
+export function validateFloors(floors) {
+  const errors = [];
+  if (!Array.isArray(floors) || floors.length === 0) return ['FLOORS table is missing'];
+  const owner = new Array(ROWS).fill(0);
+  const numbers = new Set();
+  for (const f of floors) {
+    const label = `floor ${f.floor}`;
+    if (!(f.floor > 0) || numbers.has(f.floor)) errors.push(`${label}: bad or duplicate floor number`);
+    numbers.add(f.floor);
+    if (!(f.top >= 1 && f.top <= f.walk && f.slab === f.walk + 1 && f.slab <= ROWS - 1)) {
+      errors.push(`${label}: rows top ${f.top} / walk ${f.walk} / slab ${f.slab} are inconsistent`);
+      continue;
+    }
+    for (let r = f.top; r <= f.slab; r++) {
+      if (owner[r]) errors.push(`row ${r} belongs to both floor ${owner[r]} and floor ${f.floor}`);
+      owner[r] = f.floor;
+    }
+  }
+  for (let r = 1; r < ROWS; r++) if (!owner[r]) errors.push(`row ${r} belongs to no floor`);
+  return errors;
+}
 
 export class Level {
-  constructor(grid, items, enemies, spawn) {
+  constructor(grid, items, enemies, spawn, floors = []) {
     this.grid = grid;        // grid[row][col] -> tile code
     this.items = items;      // [{ col, row, char, id, score }]
     this.enemies = enemies;  // [{ col, row, char, type, walk, climb, patrolRow, patrolFrom, patrolTo }]
     this.spawn = spawn;      // { col, row } from '@'
     this.cols = COLS;
     this.rows = ROWS;
+    this.floors = floors;    // [{ floor, top, walk, slab }], data of the level
+    // Row -> floor number; 0 for the building ceiling (row 0) or no table.
+    this.rowFloor = new Array(ROWS).fill(0);
+    for (const f of floors) for (let r = f.top; r <= f.slab; r++) this.rowFloor[r] = f.floor;
   }
+
+  // Floor a row belongs to; a slab belongs to the floor it is the floor of.
+  floorOf(row) { return row >= 0 && row < ROWS ? this.rowFloor[row] : 0; }
 
   inBounds(c, r) { return c >= 0 && c < COLS && r >= 0 && r < ROWS; }
 
@@ -58,7 +86,8 @@ export class Level {
 // Expected entity counts come from the level's own data, not from constants:
 // `expected.items` defaults to the size of itemTable, `expected.enemies` to the
 // size of enemyTable, so a level with 5 items and 2 enemies validates as strictly
-// as one with 8 and 4.
+// as one with 8 and 4. `expected.floors` is the level's FLOORS table; it is
+// required, validated and attached to the Level.
 export function parseLevel(rows, itemTable, enemyTable, expected = {}) {
   const wantItems = expected.items === undefined ? Object.keys(itemTable).length : expected.items;
   const wantEnemies = expected.enemies === undefined ? Object.keys(enemyTable).length : expected.enemies;
@@ -114,6 +143,11 @@ export function parseLevel(rows, itemTable, enemyTable, expected = {}) {
   items.sort((a, b) => a.char.localeCompare(b.char));
   enemies.sort((a, b) => a.char.localeCompare(b.char));
 
+  // FLOORS is mandatory: without it floorOf() would silently answer 0 and
+  // per-floor enemy bans would have nothing to act on.
+  const floors = expected.floors;
+  errors.push(...validateFloors(floors));
+
   if (errors.length) return { level: null, errors };
-  return { level: new Level(grid, items, enemies, spawn), errors };
+  return { level: new Level(grid, items, enemies, spawn, floors), errors };
 }
