@@ -95,7 +95,7 @@ PNG просто кладутся поверх; запускать генера�
 | `item_donut` | `item_donut.png` | 2 | 4 |
 | `item_pizza` | `item_pizza.png` | 2 | 4 |
 | `item_cake` | `item_cake.png` | 2 | 4 |
-| `item_sushi` | `item_sushi.png` | 2 | 4 |
+| `item_sushi` | `item_sushi.png` | 2 | 4 | ← сейчас это упаковка копчёного лосося; имя ключа и файла прежнее, поэтому код и уровни не менялись |
 | `item_chicken` | `item_chicken.png` | 2 | 4 |
 | `tile_wall` | `tile_wall.png` | 1 | — |
 | `tile_floor` | `tile_floor.png` | 1 | — |

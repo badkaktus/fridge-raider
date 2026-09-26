@@ -624,26 +624,59 @@ const ITEMS = {
       '................',
     ],
   },
-  // sushi roll
+  // Smoked salmon pack, kept under the item_sushi file name so no code changes:
+  // cream card header with a gold crest and red title, clear tray with orange
+  // slices, pale grain lines and a torn lower edge. Frame 2 moves the shine.
   item_sushi: {
-    pal: itemPal('#F8F8F8', '#F85858', '#308030'),
-    grid: [
-      '................',
-      '................',
-      '................',
-      '................',
-      '....CCCCCCCC....',
-      '...CAAAAAAAAC...',
-      '...CAAwAAAAAC...',
-      '...CAABBBBAAC...',
-      '...CAABBBBAAC...',
-      '...CAAAAAAAAC...',
-      '...CAAAAAAAAC...',
-      '....CCCCCCCC....',
-      '................',
-      '................',
-      '................',
-      '................',
+    pal: {
+      '.': null,
+      g: '#9AA6B8', // tray and card edge
+      c: '#F0E0C0', // cream card
+      y: '#C8A040', // gold crest
+      r: '#D03030', // red title line
+      w: '#F8F8F8', // clear tray
+      o: '#F87830', // salmon
+      O: '#C04818', // fold between slices
+      l: '#F8B070', // grain line
+      h: '#FFF0D8', // shine
+    },
+    frames: [
+      [
+        '................',
+        '..gggggggggggg..',
+        '..gccccyyccccg..',
+        '..gcrrrrrrrrcg..',
+        '..gccccccccccg..',
+        '..gggggggggggg..',
+        '..gwoooOoooowg..',
+        '..gwlhoOlooowg..',
+        '..gwolooOloowg..',
+        '..gwoolooOlowg..',
+        '..gwoooooOoowg..',
+        '..gwwoooooOowg..',
+        '..gwwwoowoOwwg..',
+        '..gwwwwwwwwwwg..',
+        '...gggggggggg...',
+        '................',
+      ],
+      [
+        '................',
+        '..gggggggggggg..',
+        '..gccccyyccccg..',
+        '..gcrrrrrrrrcg..',
+        '..gccccccccccg..',
+        '..gggggggggggg..',
+        '..gwoooOoooowg..',
+        '..gwlooOlooowg..',
+        '..gwolooOloowg..',
+        '..gwoolooOlhwg..',
+        '..gwoooooOoowg..',
+        '..gwwoooooOowg..',
+        '..gwwwoowoOwwg..',
+        '..gwwwwwwwwwwg..',
+        '...gggggggggg...',
+        '................',
+      ],
     ],
   },
   // chicken drumstick
@@ -795,7 +828,7 @@ written.push(writeStrip('enemy_ceo_walk.png', walk.map((f) => overlay(overlay(ov
 
 // Items
 for (const [name, def] of Object.entries(ITEMS)) {
-  written.push(writeStrip(`${name}.png`, [def.grid, glintFrame(def.grid)], def.pal));
+  written.push(writeStrip(`${name}.png`, def.frames || [def.grid, glintFrame(def.grid)], def.pal));
 }
 
 // Tiles and door
