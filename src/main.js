@@ -23,7 +23,9 @@ function fitToWindow() {
 window.addEventListener('resize', fitToWindow);
 fitToWindow();
 
-const game = createGame();
+// `?level=N` starts the campaign from level N, e.g. index.html?level=3.
+const startLevel = Number.parseInt(new URLSearchParams(window.location.search).get('level'), 10);
+const game = createGame(undefined, undefined, { startLevel });
 
 if (!game) {
   ctx.fillStyle = PAL.VOID;

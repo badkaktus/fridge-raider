@@ -97,7 +97,8 @@ as an argument (defaulting to the sizes of the level's own item and enemy tables
 start; there are three levels. Clearing a non-final level goes to `LEVEL_CLEAR`; clearing the last one goes to `WIN` with
 a grand total. Score and lives carry across levels (lives are never refilled); the timer,
 `collected` and the shield are per level. `GAME_OVER` and `WIN` both restart the whole campaign
-from level 1. Adding a level means adding a data file and one entry in `data/levels.js` —
+from the start level: level 1, unless the page was opened with `?level=N` (`main.js` reads it,
+`createGame(onError, levels, { startLevel })` resolves it; an unknown number falls back to level 1). Adding a level means adding a data file and one entry in `data/levels.js` —
 nothing in `render.js`, `input.js` or the logic modules should need to change.
 
 **Sprites are replaceable data.** `sprites.js` reads `assets/sprites/manifest.json`

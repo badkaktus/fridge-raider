@@ -32,6 +32,8 @@ export class Game {
     this.levels = levels;
     this.totalLevels = levels.length;
     this.livesStart = config.livesStart === undefined ? LIVES_START : config.livesStart;
+    // Level the campaign starts and restarts from; 0 unless a start level was requested.
+    this.startIndex = config.startIndex === undefined ? 0 : config.startIndex;
 
     this.player = new Player(0, 0);
     this.enemies = [];
@@ -59,11 +61,12 @@ export class Game {
   get nextLevelNumber() { return this.isLastLevel ? this.levelNumber : this.levels[this.levelIndex + 1].def.number; }
   get hintActive()   { return this.collected >= this.totalItems; }
 
-  // Full campaign reset: always back to the first level (LEVEL1.md 8.2).
+  // Full campaign reset: back to the start level, which is the first level
+  // unless the page asked for another one (LEVEL1.md 8.2).
   restartAll() {
     this.score = 0;
     this.lives = this.livesStart;
-    this.loadLevel(0);
+    this.loadLevel(this.startIndex);
   }
 
   // Loads a level: fresh items, timer and shield; score and lives are untouched.
@@ -254,7 +257,9 @@ function buildTypeGraphs(def, level, graph) {
 
 // Parses and validates every level, then builds the campaign.
 // Returns null and reports the first broken level instead of throwing.
-export function createGame(onError = (msg) => console.error(msg), levelDefs = LEVELS) {
+// `options.startLevel` is a level number to start from; an unknown one is
+// ignored and the campaign starts from the first level.
+export function createGame(onError = (msg) => console.error(msg), levelDefs = LEVELS, options = {}) {
   const parsed = [];
   for (const def of levelDefs) {
     const { level, errors } = parseLevel(def.map, def.itemTable, def.enemyTable, {
@@ -282,5 +287,6 @@ export function createGame(onError = (msg) => console.error(msg), levelDefs = LE
     onError('No levels defined');
     return null;
   }
-  return new Game(parsed);
+  const startIndex = parsed.findIndex((p) => p.def.number === options.startLevel);
+  return new Game(parsed, { startIndex: startIndex < 0 ? 0 : startIndex });
 }
