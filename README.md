@@ -74,22 +74,21 @@ python3 -m http.server 8000
 
 Затем открыть <http://localhost:8000>.
 
-Чтобы начать сразу с нужного уровня, добавь номер в адрес:
-<http://localhost:8000/?level=3>. Счёт и жизни при этом начинаются с нуля и трёх,
-а после `GAME OVER` или победы игра возвращается на тот же выбранный уровень.
-Неизвестный номер игнорируется — старт с уровня 1. На GitHub Pages работает так же:
-`https://<user>.github.io/<repo>/?level=3`.
-
 ## Деплой на GitHub Pages
 
-Репозиторий уже статический, `index.html` лежит в корне, все пути относительные.
+Игра опубликована по адресу <https://badkaktus.github.io/fridge-raider/>.
 
-1. Запушить ветку `main`.
-2. Settings → Pages → Build and deployment → Source: **Deploy from a branch**.
-3. Branch: **main**, папка: **/ (root)**. Save.
-4. Через минуту игра доступна по адресу `https://<user>.github.io/<repo>/`.
+Деплой делает GitHub Actions: workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
+запускается на каждый push в `main` (и вручную через **Run workflow**), выкладывает
+корень репозитория как есть — без сборки и зависимостей — и публикует его через
+`actions/deploy-pages`.
 
-Файл `.nojekyll` в корне уже добавлен, чтобы Pages не обрабатывал исходники.
+Для нового форка один раз включить: Settings → Pages → Build and deployment →
+Source: **GitHub Actions**. После этого достаточно запушить `main`; через минуту
+игра доступна по адресу `https://<user>.github.io/<repo>/`.
+
+Все пути в проекте относительные, а файл `.nojekyll` в корне не даёт Pages
+обрабатывать исходники Jekyll-ом.
 
 ## Спрайты
 
@@ -103,6 +102,7 @@ python3 -m http.server 8000
 
 ```
 index.html               точка входа
+.github/workflows/pages.yml  деплой на GitHub Pages
 src/main.js              канвас, масштаб, игровой цикл, ввод
 src/game.js              состояния игры, счёт, победа/поражение
 src/level.js             парсинг и валидация карты, запросы по тайлам
